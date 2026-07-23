@@ -3,7 +3,7 @@ services:
     build: .
     container_name: 5etools
     ports:
-      - "8080:80"
+      - "11014:80"
     volumes:
       # Keeps clones between restarts (img repo is large)
       - 5etools-data:/data
