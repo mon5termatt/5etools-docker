@@ -13,7 +13,7 @@ nginx listens on port 80, shows a loading page until the Node server is up, then
 ## Quick start
 
 ```bash
-cp .env.example .env   # optional — edit flags as needed
+cp .env.example .env   # optional — only needed to override defaults
 docker compose up -d --build
 ```
 

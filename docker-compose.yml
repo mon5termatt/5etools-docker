@@ -6,8 +6,9 @@ services:
       - "11014:80"
     volumes:
       - 5etools-data:/data
-    env_file:
-      - .env
+    # Optional: create a .env next to this file to override defaults.
+    # Compose loads .env for ${...} interpolation automatically when present;
+    # do not use env_file here — missing .env breaks stack deploys.
     environment:
       AUTO_PULL_INTERVAL: ${AUTO_PULL_INTERVAL:-3600}
       BUILD_SW: ${BUILD_SW:-true}
