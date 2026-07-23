@@ -1,8 +1,13 @@
 # 5etools Docker
 
-Clones [5etools-src](https://github.com/5etools-mirror-3/5etools-src) and [5etools-img](https://github.com/5etools-mirror-3/5etools-img) (into `5etools-src/img/`), then serves the site with nginx.
+Follows the [5eTools Node.js install guide](https://wiki.tercept.net/en/5eTools/InstallGuide):
 
-The web UI starts immediately. While repos are cloning or updating, missing pages show a loading screen that auto-refreshes when the site is ready. Source is served as soon as it finishes; images keep downloading in the background.
+1. Clone [5etools-src](https://github.com/5etools-mirror-3/5etools-src) and [5etools-img](https://github.com/5etools-mirror-3/5etools-img) into `5etools-src/img/`
+2. `npm i`
+3. `npm run build:sw:prod` (optional, on by default)
+4. `npm run serve:dev` (http-server on port 5050)
+
+nginx listens on port 80, shows a loading page until the Node server is up, then proxies to it.
 
 ## Quick start
 
@@ -10,42 +15,36 @@ The web UI starts immediately. While repos are cloning or updating, missing page
 docker compose up -d --build
 ```
 
-Open right away:
+Open:
 
 http://localhost:11014/
 
-First start still takes a while for the image repo (large). The loading page reports progress via `/status.json`.
+The UI is available as soon as source + `npm i` finish; images keep downloading in the background. Progress is exposed at `/status.json`.
 
-## Layout inside the container
+## Layout
 
 ```
-/data/5etools-src/          # source clone (web root)
+/data/5etools-src/          # source clone + node_modules
 /data/5etools-src/img/      # image clone
 ```
 
-Data is stored in the `5etools-data` Docker volume so restarts do not re-download everything.
+Persisted in the `5etools-data` volume.
 
 ## Config
 
 | Variable | Default | Description |
 |---|---|---|
-| `AUTO_PULL_INTERVAL` | `3600` | Seconds between `git pull`s. `0` disables. |
-| `SRC_REPO` | 5etools-src URL | Source repository |
-| `IMG_REPO` | 5etools-img URL | Image repository |
-| Port mapping | `8080:80` | Change left side in `docker-compose.yml` |
+| `AUTO_PULL_INTERVAL` | `3600` | Seconds between git pulls + rebuild. `0` disables. |
+| `BUILD_SW` | `true` | Run `npm run build:sw:prod` (caching service worker). |
+| `BUILD_SEO` | `false` | Run `npm run build:seo` (generates thousands of pages). |
+| `SRC_REPO` / `IMG_REPO` | mirror-3 URLs | Override clone sources |
+| Port mapping | `11014:80` | Change left side in `docker-compose.yml` |
 
 ## Useful commands
 
 ```bash
-# Follow logs (clone progress)
 docker compose logs -f
-
-# Force rebuild / recreate
 docker compose up -d --build --force-recreate
-
-# Stop
 docker compose down
-
-# Stop and delete downloaded data
-docker compose down -v
+docker compose down -v   # also delete downloaded data
 ```
