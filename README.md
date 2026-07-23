@@ -4,14 +4,16 @@ Follows the [5eTools Node.js install guide](https://wiki.tercept.net/en/5eTools/
 
 1. Clone [5etools-src](https://github.com/5etools-mirror-3/5etools-src) and [5etools-img](https://github.com/5etools-mirror-3/5etools-img) into `5etools-src/img/`
 2. `npm i`
-3. `npm run build:sw:prod` (optional, on by default)
-4. `npm run serve:dev` (http-server on port 5050)
+3. `npm run build:sw:prod` (on by default)
+4. `npm run build:seo` (on by default)
+5. `npm run serve:dev` (http-server on port 5050)
 
 nginx listens on port 80, shows a loading page until the Node server is up, then proxies to it.
 
 ## Quick start
 
 ```bash
+cp .env.example .env   # optional — edit flags as needed
 docker compose up -d --build
 ```
 
@@ -19,7 +21,7 @@ Open:
 
 http://localhost:11014/
 
-The UI is available as soon as source + `npm i` finish; images keep downloading in the background. Progress is exposed at `/status.json`.
+The UI is available as soon as source + `npm i` finish; images keep downloading in the background. Progress is exposed at `/status.json`, and a small overlay is injected into HTML pages while sync/build is busy.
 
 ## Layout
 
@@ -30,13 +32,13 @@ The UI is available as soon as source + `npm i` finish; images keep downloading 
 
 Persisted in the `5etools-data` volume.
 
-## Config
+## Config (`.env`)
 
 | Variable | Default | Description |
 |---|---|---|
 | `AUTO_PULL_INTERVAL` | `3600` | Seconds between git pulls + rebuild. `0` disables. |
-| `BUILD_SW` | `true` | Run `npm run build:sw:prod` (caching service worker). |
-| `BUILD_SEO` | `false` | Run `npm run build:seo` (generates thousands of pages). |
+| `BUILD_SW` | `true` | Run `npm run build:sw:prod`. Set `false` to skip. |
+| `BUILD_SEO` | `true` | Run `npm run build:seo`. Set `false` to skip. |
 | `SRC_REPO` / `IMG_REPO` | mirror-3 URLs | Override clone sources |
 | Port mapping | `11014:80` | Change left side in `docker-compose.yml` |
 

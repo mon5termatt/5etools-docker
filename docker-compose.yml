@@ -6,12 +6,14 @@ services:
       - "11014:80"
     volumes:
       - 5etools-data:/data
+    env_file:
+      - .env
     environment:
-      AUTO_PULL_INTERVAL: "3600"
-      BUILD_SW: "true"
-      BUILD_SEO: "false"
-      SRC_REPO: https://github.com/5etools-mirror-3/5etools-src.git
-      IMG_REPO: https://github.com/5etools-mirror-3/5etools-img.git
+      AUTO_PULL_INTERVAL: ${AUTO_PULL_INTERVAL:-3600}
+      BUILD_SW: ${BUILD_SW:-true}
+      BUILD_SEO: ${BUILD_SEO:-true}
+      SRC_REPO: ${SRC_REPO:-https://github.com/5etools-mirror-3/5etools-src.git}
+      IMG_REPO: ${IMG_REPO:-https://github.com/5etools-mirror-3/5etools-img.git}
     restart: unless-stopped
 
 volumes:

@@ -10,12 +10,13 @@ AUTO_PULL_INTERVAL="${AUTO_PULL_INTERVAL:-3600}"
 PORT="${PORT:-80}"
 NODE_SERVE_PORT="${NODE_SERVE_PORT:-5050}"
 BUILD_SW="${BUILD_SW:-true}"
-BUILD_SEO="${BUILD_SEO:-false}"
+BUILD_SEO="${BUILD_SEO:-true}"
 LOADING_DIR="/opt/loading"
 STATUS_FILE="/var/run/5etools-status.json"
 SITE_READY_FLAG="/var/run/5etools-ready"
 HTTP_PID_FILE="/var/run/5etools-http.pid"
 NGINX_CONF="/etc/nginx/http.d/default.conf"
+OVERLAY_JS="/opt/loading/status-overlay.js"
 
 log() {
   echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] $*" >>/proc/1/fd/1
@@ -26,11 +27,15 @@ write_status() {
   local phase="$2"
   local message="$3"
   local detail="${4:-}"
+  local busy=true
+  if [[ "${phase}" == "ready" ]]; then
+    busy=false
+  fi
   # Escape quotes in message/detail for JSON
   message="${message//\"/\\\"}"
   detail="${detail//\"/\\\"}"
   cat > "${STATUS_FILE}" <<EOF
-{"ready": ${ready}, "phase": "${phase}", "message": "${message}", "detail": "${detail}"}
+{"ready": ${ready}, "busy": ${busy}, "phase": "${phase}", "message": "${message}", "detail": "${detail}"}
 EOF
 }
 
@@ -86,16 +91,21 @@ install_and_build() {
   log "Running npm i…"
   npm i --loglevel info >>/proc/1/fd/1 2>>/proc/1/fd/2
 
-  if [[ "${BUILD_SW}" =~ ^(true|TRUE|1|yes|YES)$ ]]; then
+  # Guide Step 2 — on by default; set BUILD_SW=false / BUILD_SEO=false in .env to skip
+  if [[ ! "${BUILD_SW:-true}" =~ ^(false|FALSE|0|no|NO)$ ]]; then
     write_status false "build-sw" "Building service worker…"
     log "Running npm run build:sw:prod…"
     npm run build:sw:prod >>/proc/1/fd/1 2>>/proc/1/fd/2
+  else
+    log "Skipping build:sw:prod (BUILD_SW=${BUILD_SW})"
   fi
 
-  if [[ "${BUILD_SEO}" =~ ^(true|TRUE|1|yes|YES)$ ]]; then
+  if [[ ! "${BUILD_SEO:-true}" =~ ^(false|FALSE|0|no|NO)$ ]]; then
     write_status false "build-seo" "Building SEO pages (this can take a while)…"
     log "Running npm run build:seo…"
     npm run build:seo >>/proc/1/fd/1 2>>/proc/1/fd/2
+  else
+    log "Skipping build:seo (BUILD_SEO=${BUILD_SEO})"
   fi
 }
 
@@ -184,26 +194,53 @@ write_nginx_conf() {
 
   mkdir -p "$(dirname "${NGINX_CONF}")"
 
-  if [[ "${ready}" == true ]]; then
-    cat > "${NGINX_CONF}" <<EOF
-server {
-    listen ${PORT} default_server;
-    server_name _;
-
+  # Shared snippets: status JSON + overlay script, injected into HTML via sub_filter
+  local common_locations
+  common_locations=$(cat <<EOF
     location = /status.json {
         alias ${STATUS_FILE};
         default_type application/json;
         add_header Cache-Control "no-store";
+        add_header Access-Control-Allow-Origin "*";
     }
 
-    location / {
+    location = /status-overlay.js {
+        alias ${OVERLAY_JS};
+        default_type application/javascript;
+        add_header Cache-Control "no-cache";
+    }
+EOF
+)
+
+  local proxy_overlay
+  proxy_overlay=$(cat <<EOF
         proxy_pass http://127.0.0.1:${NODE_SERVE_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Accept-Encoding "";
         proxy_read_timeout 300s;
+
+        # Inject floating sync/build status overlay into HTML pages
+        sub_filter_types text/html;
+        sub_filter_once on;
+        sub_filter '</body>' '<script src="/status-overlay.js" defer></script></body>';
+        sub_filter '</BODY>' '<script src="/status-overlay.js" defer></script></BODY>';
+EOF
+)
+
+  if [[ "${ready}" == true ]]; then
+    cat > "${NGINX_CONF}" <<EOF
+server {
+    listen ${PORT} default_server;
+    server_name _;
+
+${common_locations}
+
+    location / {
+${proxy_overlay}
     }
 
     client_max_body_size 0;
@@ -218,20 +255,14 @@ server {
     root ${LOADING_DIR};
     index index.html;
 
-    location = /status.json {
-        alias ${STATUS_FILE};
-        default_type application/json;
-        add_header Cache-Control "no-store";
-    }
+${common_locations}
 
     # If Node is already up (restart), proxy; otherwise show loading for missing files.
     location / {
         error_page 502 503 504 = @loading;
         proxy_intercept_errors on;
-        proxy_pass http://127.0.0.1:${NODE_SERVE_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
         proxy_connect_timeout 1s;
+${proxy_overlay}
     }
 
     location @loading {
@@ -296,7 +327,7 @@ if site_files_present && deps_installed; then
   write_status true "starting" "Starting site from existing files…"
   if start_http_server; then
     touch "${SITE_READY_FLAG}"
-    write_status true "ready" "Ready — checking for updates…"
+    write_status true "checking" "Site up — checking for updates…"
   else
     write_status false "starting" "Preparing download…"
   fi

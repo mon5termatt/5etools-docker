@@ -18,7 +18,7 @@ ENV SRC_REPO=https://github.com/5etools-mirror-3/5etools-src.git \
     PORT=80 \
     NODE_SERVE_PORT=5050 \
     BUILD_SW=true \
-    BUILD_SEO=false
+    BUILD_SEO=true
 
 EXPOSE 80
 
