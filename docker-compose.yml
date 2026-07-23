@@ -1,0 +1,18 @@
+services:
+  5etools:
+    build: .
+    container_name: 5etools
+    ports:
+      - "8080:80"
+    volumes:
+      # Keeps clones between restarts (img repo is large)
+      - 5etools-data:/data
+    environment:
+      # Seconds between git pulls; set to 0 to disable
+      AUTO_PULL_INTERVAL: "3600"
+      SRC_REPO: https://github.com/5etools-mirror-3/5etools-src.git
+      IMG_REPO: https://github.com/5etools-mirror-3/5etools-img.git
+    restart: unless-stopped
+
+volumes:
+  5etools-data:
