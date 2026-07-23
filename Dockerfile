@@ -3,6 +3,7 @@ FROM nginx:alpine
 RUN apk add --no-cache git bash
 
 COPY entrypoint.sh /entrypoint.sh
+COPY loading/ /opt/loading/
 RUN chmod +x /entrypoint.sh
 
 # Persist clones across restarts when a volume is mounted here

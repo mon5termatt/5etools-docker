@@ -2,15 +2,19 @@
 
 Clones [5etools-src](https://github.com/5etools-mirror-3/5etools-src) and [5etools-img](https://github.com/5etools-mirror-3/5etools-img) (into `5etools-src/img/`), then serves the site with nginx.
 
+The web UI starts immediately. While repos are cloning or updating, missing pages show a loading screen that auto-refreshes when the site is ready. Source is served as soon as it finishes; images keep downloading in the background.
+
 ## Quick start
 
 ```bash
 docker compose up -d --build
 ```
 
-First start will take a while — the image repo is large. Then open:
+Open right away:
 
-http://localhost:8080/
+http://localhost:11014/
+
+First start still takes a while for the image repo (large). The loading page reports progress via `/status.json`.
 
 ## Layout inside the container
 
