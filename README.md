@@ -13,9 +13,10 @@ nginx listens on port 80, shows a loading page until the Node server is up, then
 ## Quick start
 
 ```bash
-cp .env.example .env   # optional — only needed to override defaults
 docker compose up -d --build
 ```
+
+A default `.env` ships in the repo (required by some stack UIs). On first container start, the same defaults are also written to `/data/.env` in the volume — edit that file and restart to change `BUILD_SW` / `BUILD_SEO` / `AUTO_PULL_INTERVAL` without rebuilding.
 
 Open:
 

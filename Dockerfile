@@ -7,6 +7,7 @@ RUN apk add --no-cache git bash nginx python3 make g++ \
 
 COPY entrypoint.sh /entrypoint.sh
 COPY loading/ /opt/loading/
+COPY .env.example /opt/defaults.env
 RUN chmod +x /entrypoint.sh
 
 VOLUME ["/data"]

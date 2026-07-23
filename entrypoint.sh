@@ -314,6 +314,27 @@ log "Starting 5etools (Node serve:dev per install guide)"
 mkdir -p "${DATA_DIR}" "$(dirname "${STATUS_FILE}")" "${SRC_DIR}" /run/nginx
 rm -f "${SITE_READY_FLAG}"
 
+# Seed .env on first start (persisted in the data volume)
+ENV_FILE="${DATA_DIR}/.env"
+if [[ ! -f "${ENV_FILE}" ]]; then
+  if [[ -f /opt/defaults.env ]]; then
+    cp /opt/defaults.env "${ENV_FILE}"
+  else
+    cat > "${ENV_FILE}" <<EOF
+BUILD_SW=true
+BUILD_SEO=true
+AUTO_PULL_INTERVAL=3600
+EOF
+  fi
+  log "Created ${ENV_FILE} from defaults"
+fi
+# Apply volume .env (allows edits without rebuilding the image)
+set -a
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+set +a
+log "Config: BUILD_SW=${BUILD_SW:-true} BUILD_SEO=${BUILD_SEO:-true} AUTO_PULL_INTERVAL=${AUTO_PULL_INTERVAL:-3600}"
+
 # Ensure Alpine nginx has a main config include for http.d
 if [[ ! -f /etc/nginx/nginx.conf ]]; then
   log "ERROR: nginx is not installed correctly"
