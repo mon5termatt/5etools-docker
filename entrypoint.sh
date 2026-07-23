@@ -50,14 +50,29 @@ clone_or_pull() {
   local repo="$1"
   local dir="$2"
   local name="$3"
+  local remote_url=""
+
+  if [[ -d "${dir}/.git" ]] || [[ -f "${dir}/.git" ]]; then
+    remote_url="$(git -C "${dir}" remote get-url origin 2>/dev/null || true)"
+    if [[ "${remote_url}" != "${repo}" && "${remote_url}" != "${repo%.git}" && "${remote_url}" != "${repo}.git" ]]; then
+      log "${name} remote mismatch (${remote_url:-none}) — recloning"
+      rm -rf "${dir}"
+    fi
+  fi
 
   if [[ -d "${dir}/.git" ]]; then
-    log "Updating ${name}..."
+    log "Force-updating ${name}..."
     git -C "${dir}" remote set-url origin "${repo}"
-    git -C "${dir}" fetch --depth 1 origin HEAD >>/proc/1/fd/1 2>>/proc/1/fd/2
+    # Drop local commits/checkout drift, then hard-reset to remote tip
+    git -C "${dir}" fetch --depth 1 --force origin HEAD >>/proc/1/fd/1 2>>/proc/1/fd/2
     git -C "${dir}" reset --hard FETCH_HEAD >>/proc/1/fd/1 2>>/proc/1/fd/2
+    # Never git-clean the src tree: that would delete the separate img/ clone
+    if [[ "${dir}" == "${IMG_DIR}" ]]; then
+      git -C "${dir}" clean -fd >>/proc/1/fd/1 2>>/proc/1/fd/2 || true
+    fi
   else
     log "Cloning ${name}..."
+    # src may leave an empty/non-git img/ placeholder — always replace
     rm -rf "${dir}"
     mkdir -p "$(dirname "${dir}")"
     git clone --depth 1 --progress "${repo}" "${dir}" >>/proc/1/fd/1 2>>/proc/1/fd/2
@@ -132,15 +147,32 @@ sync_repos() {
   write_status false "cloning-src" "Downloading 5etools source…"
   clone_or_pull "${SRC_REPO}" "${SRC_DIR}" "5etools-src"
 
+  # Kick off images immediately so a slow npm/build can't skip them (set -e)
+  write_status false "cloning-img" "Downloading images (large — please wait)…"
+  (
+    if clone_or_pull "${IMG_REPO}" "${IMG_DIR}" "5etools-img"; then
+      log "5etools-img sync complete"
+      if [[ -f "${SITE_READY_FLAG}" ]]; then
+        write_status true "ready" "Ready"
+      fi
+    else
+      log "ERROR: 5etools-img sync failed"
+    fi
+  ) &
+  local img_pid=$!
+
   install_and_build
-  start_http_server
-  write_status true "cloning-img" "Site ready — downloading images…" "You can browse now; images may appear as they finish."
+  # Don't abort the whole sync if the server is just slow to bind
+  start_http_server || log "http-server not confirmed up yet; continuing"
+  write_status true "cloning-img" "Site ready — images still syncing…" "You can browse now; images may appear as they finish."
   mark_ready_and_proxy
 
-  write_status true "cloning-img" "Downloading images (large — please wait)…"
-  clone_or_pull "${IMG_REPO}" "${IMG_DIR}" "5etools-img"
-
-  write_status true "ready" "Ready"
+  log "Waiting for 5etools-img sync (pid ${img_pid})…"
+  if wait "${img_pid}"; then
+    write_status true "ready" "Ready"
+  else
+    write_status true "ready" "Ready — image sync had errors (will retry later)"
+  fi
   mark_ready_and_proxy
 }
 
